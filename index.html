@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CapMar - Descobrir (previa)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--background:#f6f1e7;--surface:#fffdf8;--surface-2:#faf5ea;--foreground:#14262e;--muted:#55666c;--line:#ddd3bf;--line-soft:#eae2d0;--primary:#1b4fa8;--primary-strong:#143c82;--primary-soft:#e4ebf7;--secondary:#0e2f3c;--accent:#c4492a;--accent-strong:#a43a1e;--sun:#f2b33d;--danger:#b3261e;--like:#1f6b4a;--success-soft:#e0f0e7}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--background);color:var(--foreground);font-family:Figtree,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer;background:none;border:0;color:inherit}
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none}
+.h{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;letter-spacing:-.02em;color:var(--secondary)}
+main{margin:0 auto;display:flex;flex-direction:column;min-height:100dvh;width:100%;max-width:560px;padding:16px 16px 32px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.brand span{font-size:18px}
+.count{font-size:14px;font-weight:600;color:var(--muted)}
+.bar{margin-top:12px;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar>div{height:100%;background:var(--primary);border-radius:99px;transition:width .3s}
+.stage{position:relative;margin:16px 0;min-height:420px;flex:1}
+.card{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;border-radius:24px;border:1px solid var(--line);background:var(--surface);box-shadow:0 18px 40px -22px rgba(14,47,60,.45);touch-action:none;user-select:none;-webkit-user-select:none;transition:transform 240ms cubic-bezier(.2,.7,.3,1)}
+.card.back{transform:scale(.94) translateY(14px);pointer-events:none;z-index:1}
+.card.front{z-index:2;cursor:grab}
+.cover{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;width:100%}
+.cover .ini{position:relative;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:96px;line-height:1;opacity:.9}
+.tiles{position:absolute;inset:0;opacity:.18;background-size:56px 56px}
+.stamp{position:absolute;top:20px;padding:4px 12px;border:4px solid;border-radius:12px;background:rgba(255,255,255,.85);font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:24px}
+.stamp.like{left:20px;transform:rotate(-12deg);color:var(--like);border-color:var(--like);opacity:clamp(0,var(--p,0),1)}
+.stamp.pass{right:20px;transform:rotate(12deg);color:var(--danger);border-color:var(--danger);opacity:clamp(0,calc(var(--p,0) * -1),1)}
+.hint{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center}
+.hint span{display:inline-flex;align-items:center;gap:4px;border-radius:99px;background:rgba(14,47,60,.7);color:#fff;padding:4px 12px;font-size:12px;font-weight:600}
+.info{padding:16px 20px 20px}
+.cat{font-size:13px;font-weight:600;color:var(--primary)}
+.name{font-size:26px;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.actions{display:grid;grid-template-columns:repeat(4,1fr);align-items:start;gap:8px;padding:0 4px}
+.round{display:flex;flex-direction:column;align-items:center;gap:6px}
+.round button{display:grid;place-items:center;border-radius:50%;border:2px solid;transition:transform .15s}
+.round button:active{transform:scale(.95)}
+.round button:disabled{opacity:.4}
+.round small{font-size:12px;font-weight:600;color:var(--muted)}
+.tip{margin-top:16px;text-align:center;font-size:13px;color:var(--muted)}
+.panel{border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.btn{display:inline-flex;min-height:44px;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:10px 18px;color:var(--primary-strong);font-size:15px;font-weight:650}
+.btn:active{transform:translateY(1px) scale(.985)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.like{background:var(--like);border-color:var(--like);color:#fff}
+.badge{display:inline-flex;align-items:center;border-radius:8px;background:var(--surface-2);border:1px solid var(--line-soft);padding:3px 9px;color:#435358;font-size:13px;font-weight:650}
+.badge.pub{background:var(--success-soft);border-color:#bcdcc9;color:#17543a}
+.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(14,47,60,.55)}
+.sheet{display:flex;flex-direction:column;width:100%;max-width:560px;max-height:88dvh;overflow:hidden;border-radius:24px 24px 0 0;background:var(--surface);animation:up .28s cubic-bezier(.16,1,.3,1)}
+@media(min-width:640px){.overlay{align-items:center;padding:24px}.sheet{border-radius:24px}}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.sheet-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:12px 20px}
+.sheet-b{flex:1;min-height:0;overflow-y:auto;padding:16px 20px}
+.sheet-f{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--line);padding:12px 20px}
+.x{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;flex-shrink:0}
+.kw{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.tut{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(14,47,60,.7);padding:20px}
+.tut>div{width:100%;max-width:384px;border-radius:24px;background:var(--surface);padding:24px;animation:up .28s cubic-bezier(.16,1,.3,1)}
+.tut ul{margin-top:16px;display:grid;gap:12px;font-size:15px}
+.note{margin-top:16px;border-radius:12px;background:var(--surface-2);padding:12px;font-size:13px;color:var(--muted)}
+.end{display:grid;gap:20px;padding-bottom:24px;margin-top:24px;animation:up .28s cubic-bezier(.16,1,.3,1)}
+.row{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:12px;border-radius:12px;padding:0 8px;font-size:15px;font-weight:600;color:var(--secondary)}
+.rank{display:flex;min-height:48px;align-items:center;gap:12px;padding:0 8px}
+.rank i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--surface-2);font:800 13px "Bricolage Grotesque",system-ui;font-style:normal;color:var(--secondary)}
+.rank i.top{background:var(--sun)}
+.rank b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;color:var(--secondary)}
+.rank em{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;font-style:normal;color:var(--accent-strong)}
+.demo{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:2px 10px;z-index:40;white-space:nowrap}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div class="demo">Prévia com dados de exemplo · nada é gravado</div>
+<script>
+const svg=(s,p)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const I={
+ x:s=>svg(s,`<path d="M18 6 6 18M6 6l12 12"/>`),
+ heart:s=>svg(s,`<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>`),
+ undo:s=>svg(s,`<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>`),
+ info:s=>svg(s,`<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>`),
+ down:s=>svg(s,`<path d="m6 9 6 6 6-6"/>`),
+ out:s=>svg(s,`<path d="M7 7h10v10M7 17 17 7"/>`),
+};
+const LOGO=`<svg width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#1b4fa8"/><circle cx="21.5" cy="11.5" r="4.5" fill="#f2b33d"/><path d="M5 19.5c2.6 0 2.6-2 5.2-2s2.6 2 5.2 2 2.6-2 5.2-2 2.6 2 6.4 2" fill="none" stroke="#fffdf8" stroke-width="2.2" stroke-linecap="round"/><path d="M5 25c2.6 0 2.6-2 5.2-2s2.6 2 5.2 2 2.6-2 5.2-2 2.6 2 6.4 2" fill="none" stroke="#fffdf8" stroke-opacity=".55" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+const COVERS=[{bg:"#e3eaf7",fg:"#1b4fa8"},{bg:"#dff0f1",fg:"#0e6a73"},{bg:"#f7e6df",fg:"#a63d22"},{bg:"#f8edd3",fg:"#8a5d0a"},{bg:"#e0efe7",fg:"#1f6b4a"}];
+const hash=t=>{let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))>>>0;return h};
+const esc=s=>{const d=document.createElement("div");d.textContent=String(s);return d.innerHTML};
+const TILES=["radial-gradient(circle at 50% 50%,currentColor 0 10px,transparent 11px)","linear-gradient(45deg,currentColor 25%,transparent 25% 75%,currentColor 75%)","repeating-linear-gradient(45deg,currentColor 0 4px,transparent 4px 14px)"];
+const PROJECTS=[
+ {id:1,name:"Horta Comunitária Itaipuaçu",category:"Agricultura urbana",owner:"Ana Lúcia Ferreira",support:true,kw:["hortas","alimentação","bairro"],desc:"Transformamos um terreno baldio em horta coletiva que abastece 40 famílias com verduras sem agrotóxico. Queremos ampliar para mais dois terrenos e montar oficinas de compostagem com a escola do bairro."},
+ {id:2,name:"Pesca Artesanal da Lagoa",category:"Pesca e maricultura",owner:"Jorge Pescador",support:true,kw:["pesca","lagoa","tradição"],desc:"Cooperativa de pescadores da lagoa que vende direto ao consumidor, com registro de onde e quando o peixe foi pescado. Buscamos apoio para uma câmara fria compartilhada."},
+ {id:3,name:"Capivara Bike Tour",category:"Turismo",owner:"Rafael Moura",support:false,kw:["bicicleta","turismo","orla"],desc:"Passeios guiados de bicicleta pela orla e pelas lagoas de Maricá, contando a história da cidade e dos seus bichos. Roteiros de 2 a 4 horas para todas as idades."},
+ {id:4,name:"Sabão da Restinga",category:"Cosméticos naturais",owner:"Beatriz Santos",support:true,kw:["sustentável","artesanal","óleo reciclado"],desc:"Sabonetes e sabão em barra feitos com óleo de cozinha recolhido em restaurantes da cidade e ervas da restinga. Cada barra tira meio litro de óleo do esgoto."},
+ {id:5,name:"Escola de Surf Ponta Negra",category:"Esporte",owner:"Thiago Lima",support:true,kw:["surf","jovens","praia"],desc:"Aulas de surf gratuitas para jovens de escola pública aos sábados, com pranchas doadas. Precisamos de apoio para manter os instrutores e comprar coletes."},
+ {id:6,name:"Mumbuca Delivery",category:"Tecnologia",owner:"Larissa Oliveira",support:false,kw:["app","comércio local","mumbuca"],desc:"Aplicativo de entrega que aceita a moeda Mumbuca e só trabalha com comércio de Maricá. Já são 35 lojas no piloto em Inoã e no Centro."},
+ {id:7,name:"Ateliê Azulejo Vivo",category:"Artesanato",owner:"Cláudia Ribeiro",support:true,kw:["cerâmica","arte","oficinas"],desc:"Azulejos pintados à mão com temas de Maricá: capivaras, lagoas e a Pedra do Elefante. Fazemos oficinas abertas na praça uma vez por mês."},
+ {id:8,name:"Reciclar Maricá",category:"Meio ambiente",owner:"Coletivo Recicla",support:true,kw:["reciclagem","coleta","renda"],desc:"Rede de catadores organizada com pontos de entrega voluntária nos bairros. A meta do ano é dobrar o volume coletado e formalizar 20 catadores."},
+ {id:9,name:"Doce de Banana da Vó Dita",category:"Alimentação",owner:"Edite Gonçalves",support:false,kw:["doces","receita de família","feira"],desc:"Doce de banana em corte feito no tacho, com receita de quatro gerações. Vendemos na feira de Itaipuaçu e queremos chegar aos mercados da cidade."},
+ {id:10,name:"Cine Lagoa ao Ar Livre",category:"Cultura",owner:"Pedro Henrique Alves",support:true,kw:["cinema","cultura","comunidade"],desc:"Sessões de cinema gratuitas em praças e na beira da lagoa, com filmes nacionais e curtas de realizadores de Maricá. Uma sessão por mês em bairros diferentes."}
+];
+const BASE_LIKES={1:14,2:11,3:8,4:12,5:16,6:9,7:10,8:13,9:7,10:15};
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+let tutSeen=false;try{tutSeen=localStorage.getItem("capmar_demo_tut")==="1"}catch(e){}
+const S={cards:shuffle(PROJECTS.slice()),remaining:[],votes:{},history:[],detail:null,tutorial:!tutSeen,busy:false};
+S.remaining=S.cards.slice();
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const app=document.getElementById("app");
+function cover(c){const k=COVERS[hash(c.category||c.name)%COVERS.length];const t=TILES[c.id%TILES.length];
+ return `<div class="cover" style="background:${k.bg};color:${k.fg}"><div class="tiles" style="background-image:${t}"></div><span class="ini">${esc(c.name.charAt(0))}</span>`}
+function cardHTML(c,front){return `<article class="card ${front?"front":"back"}" ${front?`id="front"`:`aria-hidden="true"`}>${cover(c)}<span class="stamp like">CURTI</span><span class="stamp pass">PASSO</span>${front?`<span class="hint"><span>${I.down(14)}Toque para ver mais</span></span>`:""}</div><div class="info">${c.category?`<p class="cat">${esc(c.category)}</p>`:""}<h2 class="h name">${esc(c.name)}</h2></div></article>`}
+function roundBtn(a,label,size,style,icon){return `<div class="round"><button data-a="${a}" aria-label="${label}" style="width:${size}px;height:${size}px;${style}">${icon}</button><small>${label}</small></div>`}
+function render(){
+ const total=S.cards.length,done=total-S.remaining.length,finished=S.remaining.length===0;
+ const likes=Object.values(S.votes).filter(v=>v==="like").length;
+ let h=`<header><a class="brand" href="#" data-a="noop">${LOGO}<span class="h">Descobrir</span></a><p class="count">${Math.min(done+(finished?0:1),total)} de ${total}</p></header><div class="bar"><div style="width:${done/total*100}%"></div></div>`;
+ if(finished)h+=endHTML();
+ else{
+  const two=S.remaining.slice(0,2);
+  h+=`<div class="stage" id="stage">${two.slice().reverse().map(c=>cardHTML(c,c===two[0])).join("")}</div><div class="actions">`
+   +roundBtn("undo","Desfazer",48,"margin-top:8px;border-color:var(--line);background:var(--surface);color:var(--secondary)"+(S.history.length?"":";opacity:.4"),I.undo(20))
+   +roundBtn("dislike","Passar",60,"border-color:var(--danger);background:var(--surface);color:var(--danger)",I.x(30))
+   +roundBtn("detail","Detalhes",48,"margin-top:8px;border-color:var(--line);background:var(--surface);color:var(--primary)",I.info(22))
+   +roundBtn("like","Curtir",60,"border-color:var(--like);background:var(--like);color:#fff",I.heart(28))
+   +`</div><p class="tip">Arraste para a direita para curtir e para a esquerda para passar.</p><p class="tip" style="margin-top:4px">${likes} curtidas até agora</p>`;
+ }
+ if(S.detail)h+=detailHTML(S.detail);
+ if(S.tutorial)h+=`<div class="tut"><div role="dialog" aria-modal="true"><h2 class="h" style="font-size:24px">Como funciona</h2><ul><li><strong style="color:var(--like)">Arraste para a direita</strong> para curtir.</li><li><strong style="color:var(--danger)">Arraste para a esquerda</strong> para passar.</li><li><strong>Toque no cartão</strong> ou role para baixo para ver os detalhes.</li></ul><p class="note">Para a pesquisa do evento, registramos de forma anônima o que você faz aqui (votos, tempo e tipo de aparelho). Não pedimos nome nem contato.</p><button class="btn primary" data-a="tut" style="margin-top:20px;width:100%">Entendi, vamos lá</button></div></div>`;
+ app.innerHTML=h;bindDrag();
+}
+function detailHTML(d){return `<div class="overlay" data-a="close"><div class="sheet" role="dialog" aria-modal="true" data-a="stay"><div class="sheet-h"><div style="min-width:0">${d.category?`<p class="cat">${esc(d.category)}</p>`:""}<h2 class="h" style="font-size:24px;line-height:1.15">${esc(d.name)}</h2></div><button class="x" data-a="close" aria-label="Fechar detalhes">${I.x(22)}</button></div><div class="sheet-b"><div style="height:180px;border-radius:16px;overflow:hidden;margin-bottom:16px;display:flex">${cover(d)}</div></div><p style="font-size:14px;color:var(--muted)">Por <strong style="color:var(--secondary)">${esc(d.owner)}</strong></p><p style="margin-top:12px;font-size:16px;line-height:1.6">${esc(d.desc)}</p><ul class="kw">${d.kw.map(k=>`<li class="badge">${esc(k)}</li>`).join("")}</ul>${d.support?`<p style="margin-top:16px"><span class="badge pub">Aceita apoio</span></p>`:""}<a class="btn" style="margin-top:20px" href="#" data-a="noop">Ver página completa${I.out(16)}</a></div><div class="sheet-f"><button class="btn danger" data-a="dislike">${I.x(18)}Passar</button><button class="btn like" data-a="like">${I.heart(18)}Curtir</button></div></div></div>`}
+function endHTML(){
+ const liked=S.cards.filter(c=>S.votes[c.id]==="like"),passed=S.cards.filter(c=>S.votes[c.id]==="dislike").length;
+ const rank=PROJECTS.map(p=>({name:p.name,likes:BASE_LIKES[p.id]+(S.votes[p.id]==="like"?1:0)})).sort((a,b)=>b.likes-a.likes).slice(0,5);
+ return `<div class="end"><div class="panel" style="padding:24px;text-align:center"><p class="h" style="font-size:36px">Acabou!</p><p style="margin-top:8px;color:var(--muted)">Você avaliou ${liked.length+passed} projetos: <strong style="color:var(--secondary)">${liked.length} curtidas</strong> e ${passed} passes.</p></div>`
+ +(liked.length?`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px">Projetos que você curtiu</h2><ul style="margin-top:8px">${liked.map(c=>`<li><a class="row" href="#" data-a="noop"><span>${esc(c.name)}</span><span style="color:var(--primary)">${I.out(16)}</span></a></li>`).join("")}</ul></section>`:"")
+ +`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px;display:flex;align-items:center;gap:8px"><span style="color:var(--accent);display:flex">${I.heart(18)}</span>Mais curtidos do evento</h2><ol style="margin-top:8px">${rank.map((r,i)=>`<li class="rank"><i class="${i===0?"top":""}">${i+1}</i><b>${esc(r.name)}</b><em>${I.heart(14)}${r.likes}</em></li>`).join("")}</ol><p style="margin-top:12px;padding:0 8px;font-size:13px;color:var(--muted)">25 pessoas já votaram (ranking de exemplo).</p></section>`
+ +`<div class="panel" style="display:grid;gap:12px;padding:20px"><p style="font-size:15px;color:var(--secondary)"><strong>Seu projeto também pode estar aqui.</strong> Crie uma conta e apresente o que você faz.</p><a class="btn primary" href="#" data-a="noop">Criar minha conta${I.out(18)}</a><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><button class="btn" data-a="restart">${I.undo(16)}Rever tudo</button><a class="btn" href="#" data-a="noop">Ver vitrine</a></div></div></div>`;
+}
+function vote(choice){
+ const c=S.remaining[0];if(!c||S.busy||S.tutorial)return;S.busy=true;
+ S.votes[c.id]=choice;S.history.push({card:c,choice});
+ if(S.detail){S.detail=null;render()}
+ const finish=()=>{S.remaining.shift();S.busy=false;render()};
+ const n=document.getElementById("front");
+ if(n&&!reduced){const dir=choice==="like"?1:-1;n.style.setProperty("--p",dir);n.style.transition="transform 280ms cubic-bezier(.2,.7,.3,1),opacity 280ms ease-out";n.style.transform=`translate3d(${dir*innerWidth*1.1}px,-30px,0) rotate(${dir*20}deg)`;n.style.opacity="0";setTimeout(finish,280)}else finish();
+}
+function undo(){if(S.busy||!S.history.length||S.tutorial)return;const last=S.history.pop();delete S.votes[last.card.id];S.remaining.unshift(last.card);render()}
+function openDetail(){if(!S.remaining[0]||S.busy||S.detail||S.tutorial)return;S.detail=S.remaining[0];render()}
+function seeTut(){try{localStorage.setItem("capmar_demo_tut","1")}catch(err){}S.tutorial=false;render()}
+app.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a;
+ if(a==="noop"){e.preventDefault();return}
+ if(a==="stay")return;
+ if(a==="close"){S.detail=null;render()}
+ else if(a==="like"||a==="dislike")vote(a);
+ else if(a==="undo")undo();
+ else if(a==="detail")openDetail();
+ else if(a==="tut")seeTut();
+ else if(a==="restart"){S.history=[];S.votes={};S.cards=shuffle(PROJECTS.slice());S.remaining=S.cards.slice();render()}
+});
+addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&S.detail){S.detail=null;render();return}
+ if(S.tutorial)return;
+ if(e.key==="ArrowRight")vote("like");
+ else if(e.key==="ArrowLeft")vote("dislike");
+ else if(e.key==="ArrowDown"&&!S.detail)openDetail();
+ else if(e.key==="z"||e.key==="Z")undo();
+});
+function bindDrag(){
+ const el=document.getElementById("front");if(!el)return;let d=null;
+ const reset=()=>{el.style.transition="transform 240ms cubic-bezier(.2,.7,.3,1)";el.style.transform="translate3d(0,0,0) rotate(0deg)";el.style.setProperty("--p","0")};
+ el.addEventListener("pointerdown",e=>{if(S.busy||S.tutorial||(e.pointerType==="mouse"&&e.button!==0))return;d={x:e.clientX,y:e.clientY,t:performance.now()};el.setPointerCapture(e.pointerId);el.style.transition="none"});
+ el.addEventListener("pointermove",e=>{if(!d)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;el.style.transform=`translate3d(${dx}px,${dy*.18}px,0) rotate(${dx/22}deg)`;el.style.setProperty("--p",Math.max(-1,Math.min(1,dx/110)))});
+ el.addEventListener("pointerup",e=>{if(!d)return;const dx=e.clientX-d.x,dy=e.clientY-d.y,dt=Math.max(1,performance.now()-d.t);d=null;
+  const far=Math.abs(dx)>Math.min(110,el.offsetWidth*.28),flick=Math.abs(dx)>40&&Math.abs(dx)/dt>.6;
+  if(Math.abs(dx)<8&&Math.abs(dy)<8&&dt<600){reset();openDetail();return}
+  if((far||flick)&&Math.abs(dx)>Math.abs(dy)){vote(dx>0?"like":"dislike");return}
+  if(dy<-80&&Math.abs(dy)>Math.abs(dx)){reset();openDetail();return}
+  reset()});
+ el.addEventListener("pointercancel",()=>{if(d){d=null;reset()}});
+ const st=document.getElementById("stage");if(st)st.addEventListener("wheel",e=>{if(e.deltaY>25)openDetail()},{passive:true});
+}
+render();
+</script>
+</body>
+</html>
