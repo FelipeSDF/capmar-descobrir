@@ -83,8 +83,29 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 </head>
 <body>
 <main id="app"></main>
-<div class="demo">Prévia com dados de exemplo · nada é gravado</div>
+<div class="demo">Projetos de exemplo · votos anônimos</div>
 <script>
+const API="https://script.google.com/macros/s/AKfycbyEqkz5dASQtGKt60qlVo2rjHd8ljWYrQ2Nu5-u0IZp98_J_eWFzh6AwUVpcLlEoQL6/exec";
+const uuid=()=>crypto.randomUUID?crypto.randomUUID():"10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+let SID=ls.get("capmar_discover_session");if(!SID||!/^[0-9a-f-]{36}$/.test(SID)){SID=uuid();ls.set("capmar_discover_session",SID)}
+let Q=[];try{Q=JSON.parse(ls.get("capmar_discover_queue")||"[]")}catch(e){Q=[]}
+let sending=false,timer=null,fails=0;
+const device=()=>({language:(navigator.language||"").slice(0,16),viewport_w:innerWidth,viewport_h:innerHeight,touch:"ontouchstart" in window||navigator.maxTouchPoints>0,ua:navigator.userAgent.slice(0,160),source:new URLSearchParams(location.search).get("e")||undefined});
+function track(type,data){Q.push(Object.assign({id:uuid(),type,ts:Date.now()},data||{}));ls.set("capmar_discover_queue",JSON.stringify(Q.slice(-2000)));if(type==="like"||type==="dislike"||type==="undo")flush();else sched(1500)}
+function sched(ms){if(timer)return;timer=setTimeout(()=>{timer=null;flush()},ms)}
+async function flush(keepalive){if(sending||!Q.length)return;sending=true;const batch=Q.slice(0,100);
+ try{const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({session_id:SID,device:device(),events:batch}),keepalive:!!keepalive,redirect:"follow"});
+  const j=await r.json();if(!j.ok&&j.erro!=="json invalido"&&j.erro!=="sessao invalida")throw new Error(j.erro);
+  Q=Q.slice(batch.length);ls.set("capmar_discover_queue",JSON.stringify(Q));fails=0}
+ catch(e){fails++;sched(Math.min(30000,1500*2**fails))}
+ finally{sending=false}
+ if(Q.length&&!fails)flush(keepalive)}
+async function fetchRanking(){const r=await fetch(API+"?acao=ranking&t="+Date.now());const j=await r.json();if(!j.ok)throw new Error("ranking");return j}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){track("page_hidden");flush(true)}else track("page_visible")});
+addEventListener("online",()=>{fails=0;flush()});
+track("session_start",{meta:{path:location.pathname}});
+
 const svg=(s,p)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const I={
  x:s=>svg(s,`<path d="M18 6 6 18M6 6l12 12"/>`),
@@ -128,6 +149,7 @@ const PROJECTS=[
 const BASE_LIKES={1:14,2:11,3:8,4:12,5:16,6:9,7:10,8:13,9:7,10:15};
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let tutSeen=false;try{tutSeen=localStorage.getItem("capmar_demo_tut")==="1"}catch(e){}
+let RANK=null,RANK_LOADING=false,shownAt=performance.now();
 const S={cards:shuffle(PROJECTS.slice()),remaining:[],votes:{},history:[],detail:null,tutorial:!tutSeen,busy:false};
 S.remaining=S.cards.slice();
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -157,23 +179,26 @@ function render(){
 function detailHTML(d){return `<div class="overlay" data-a="close"><div class="sheet" role="dialog" aria-modal="true" data-a="stay"><div class="sheet-h"><span class="logo" style="width:48px;height:48px">${LOGOS[d.id]||""}</span><div style="min-width:0;flex:1">${d.category?`<p class="cat">${esc(d.category)}</p>`:""}<h2 class="h" style="font-size:24px;line-height:1.15">${esc(d.name)}</h2></div><button class="x" data-a="close" aria-label="Fechar detalhes">${I.x(22)}</button></div><div class="sheet-b"><div style="height:220px;border-radius:16px;overflow:hidden;display:flex">${cover(d)}</div></div>${PHOTOS[d.id]?`<p style="margin:6px 0 16px;font-size:12px;color:var(--muted)">Foto: <a href="${PHOTOS[d.id].page}" target="_blank" rel="noopener" style="text-decoration:underline">${esc(PHOTOS[d.id].credit)}</a> (imagem ilustrativa)</p>`:`<div style="height:16px"></div>`}<p style="font-size:14px;color:var(--muted)">Por <strong style="color:var(--secondary)">${esc(d.owner)}</strong></p><p style="margin-top:12px;font-size:16px;line-height:1.6">${esc(d.desc)}</p><ul class="kw">${d.kw.map(k=>`<li class="badge">${esc(k)}</li>`).join("")}</ul>${d.support?`<p style="margin-top:16px"><span class="badge pub">Aceita apoio</span></p>`:""}<a class="btn" style="margin-top:20px" href="#" data-a="noop">Ver página completa${I.out(16)}</a></div><div class="sheet-f"><button class="btn danger" data-a="dislike">${I.x(18)}Passar</button><button class="btn like" data-a="like">${I.heart(18)}Curtir</button></div></div></div>`}
 function endHTML(){
  const liked=S.cards.filter(c=>S.votes[c.id]==="like"),passed=S.cards.filter(c=>S.votes[c.id]==="dislike").length;
- const rank=PROJECTS.map(p=>({name:p.name,likes:BASE_LIKES[p.id]+(S.votes[p.id]==="like"?1:0)})).sort((a,b)=>b.likes-a.likes).slice(0,5);
+ if(!RANK&&!RANK_LOADING){RANK_LOADING=true;track("deck_end",{value:S.cards.length,meta:{likes:liked.length}});setTimeout(()=>flush(),50);setTimeout(()=>fetchRanking().then(r=>{RANK=r;track("ranking_view")}).catch(()=>{RANK={people:0,items:[],fail:true}}).finally(()=>{RANK_LOADING=false;if(!S.remaining.length)render()}),900)}
+ const byId=Object.fromEntries(PROJECTS.map(p=>[p.id,p.name]));
+ const rank=RANK&&!RANK.fail?RANK.items.filter(r=>byId[r.project_id]&&r.likes>0).slice(0,5).map(r=>({name:byId[r.project_id],likes:r.likes})):[];
  return `<div class="end"><div class="panel" style="padding:24px;text-align:center"><p class="h" style="font-size:36px">Acabou!</p><p style="margin-top:8px;color:var(--muted)">Você avaliou ${liked.length+passed} projetos: <strong style="color:var(--secondary)">${liked.length} curtidas</strong> e ${passed} passes.</p></div>`
  +(liked.length?`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px">Projetos que você curtiu</h2><ul style="margin-top:8px">${liked.map(c=>`<li><a class="row" href="#" data-a="noop"><span>${esc(c.name)}</span><span style="color:var(--primary)">${I.out(16)}</span></a></li>`).join("")}</ul></section>`:"")
- +`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px;display:flex;align-items:center;gap:8px"><span style="color:var(--accent);display:flex">${I.heart(18)}</span>Mais curtidos do evento</h2><ol style="margin-top:8px">${rank.map((r,i)=>`<li class="rank"><i class="${i===0?"top":""}">${i+1}</i><b>${esc(r.name)}</b><em>${I.heart(14)}${r.likes}</em></li>`).join("")}</ol><p style="margin-top:12px;padding:0 8px;font-size:13px;color:var(--muted)">25 pessoas já votaram (ranking de exemplo).</p></section>`
+ +`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px;display:flex;align-items:center;gap:8px"><span style="color:var(--accent);display:flex">${I.heart(18)}</span>Mais curtidos do evento</h2>${RANK===null?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">Carregando ranking…</p>`:RANK.fail?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">Não foi possível carregar o ranking agora.</p>`:!rank.length?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">O ranking aparece assim que houver curtidas.</p>`:""}<ol style="margin-top:8px">${rank.map((r,i)=>`<li class="rank"><i class="${i===0?"top":""}">${i+1}</i><b>${esc(r.name)}</b><em>${I.heart(14)}${r.likes}</em></li>`).join("")}</ol>${RANK&&!RANK.fail?`<p style="margin-top:12px;padding:0 8px;font-size:13px;color:var(--muted)">${RANK.people} ${RANK.people===1?"pessoa já votou":"pessoas já votaram"}.</p>`:""}</section>`
  +`<div class="panel" style="display:grid;gap:12px;padding:20px"><p style="font-size:15px;color:var(--secondary)"><strong>Seu projeto também pode estar aqui.</strong> Crie uma conta e apresente o que você faz.</p><a class="btn primary" href="#" data-a="noop">Criar minha conta${I.out(18)}</a><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><button class="btn" data-a="restart">${I.undo(16)}Rever tudo</button><a class="btn" href="#" data-a="noop">Ver vitrine</a></div></div></div>`;
 }
 function vote(choice){
  const c=S.remaining[0];if(!c||S.busy||S.tutorial)return;S.busy=true;
+ track(choice,{project_id:c.id,method:S.detail?"details":(window.__m||"button"),position:S.cards.indexOf(c),dwell_ms:Math.round(performance.now()-shownAt)});window.__m=null;
  S.votes[c.id]=choice;S.history.push({card:c,choice});
  if(S.detail){S.detail=null;render()}
- const finish=()=>{S.remaining.shift();S.busy=false;render()};
+ const finish=()=>{S.remaining.shift();S.busy=false;shownAt=performance.now();if(S.remaining[0])track("card_view",{project_id:S.remaining[0].id,position:S.cards.indexOf(S.remaining[0])});render()};
  const n=document.getElementById("front");
  if(n&&!reduced){const dir=choice==="like"?1:-1;n.style.setProperty("--p",dir);n.style.transition="transform 280ms cubic-bezier(.2,.7,.3,1),opacity 280ms ease-out";n.style.transform=`translate3d(${dir*innerWidth*1.1}px,-30px,0) rotate(${dir*20}deg)`;n.style.opacity="0";setTimeout(finish,280)}else finish();
 }
-function undo(){if(S.busy||!S.history.length||S.tutorial)return;const last=S.history.pop();delete S.votes[last.card.id];S.remaining.unshift(last.card);render()}
-function openDetail(){if(!S.remaining[0]||S.busy||S.detail||S.tutorial)return;S.detail=S.remaining[0];render()}
-function seeTut(){try{localStorage.setItem("capmar_demo_tut","1")}catch(err){}S.tutorial=false;render()}
+function undo(){if(S.busy||!S.history.length||S.tutorial)return;const last=S.history.pop();track("undo",{project_id:last.card.id,method:"button",meta:{previous:last.choice}});RANK=null;delete S.votes[last.card.id];S.remaining.unshift(last.card);render()}
+function openDetail(){if(!S.remaining[0]||S.busy||S.detail||S.tutorial)return;S.detail=S.remaining[0];track("details_open",{project_id:S.detail.id,position:S.cards.indexOf(S.detail)});render()}
+function seeTut(){track("tutorial_dismiss");shownAt=performance.now();try{localStorage.setItem("capmar_demo_tut","1")}catch(err){}S.tutorial=false;render()}
 app.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a;
  if(a==="noop"){e.preventDefault();return}
  if(a==="stay")return;
@@ -182,13 +207,13 @@ app.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)retu
  else if(a==="undo")undo();
  else if(a==="detail")openDetail();
  else if(a==="tut")seeTut();
- else if(a==="restart"){S.history=[];S.votes={};S.cards=shuffle(PROJECTS.slice());S.remaining=S.cards.slice();render()}
+ else if(a==="restart"){S.history=[];S.votes={};S.cards=shuffle(PROJECTS.slice());S.remaining=S.cards.slice();RANK=null;render()}
 });
 addEventListener("keydown",e=>{
  if(e.key==="Escape"&&S.detail){S.detail=null;render();return}
  if(S.tutorial)return;
- if(e.key==="ArrowRight")vote("like");
- else if(e.key==="ArrowLeft")vote("dislike");
+ if(e.key==="ArrowRight"){window.__m="keyboard";vote("like")}
+ else if(e.key==="ArrowLeft"){window.__m="keyboard";vote("dislike")}
  else if(e.key==="ArrowDown"&&!S.detail)openDetail();
  else if(e.key==="z"||e.key==="Z")undo();
 });
@@ -200,13 +225,13 @@ function bindDrag(){
  el.addEventListener("pointerup",e=>{if(!d)return;const dx=e.clientX-d.x,dy=e.clientY-d.y,dt=Math.max(1,performance.now()-d.t);d=null;
   const far=Math.abs(dx)>Math.min(110,el.offsetWidth*.28),flick=Math.abs(dx)>40&&Math.abs(dx)/dt>.6;
   if(Math.abs(dx)<8&&Math.abs(dy)<8&&dt<600){reset();openDetail();return}
-  if((far||flick)&&Math.abs(dx)>Math.abs(dy)){vote(dx>0?"like":"dislike");return}
+  if((far||flick)&&Math.abs(dx)>Math.abs(dy)){window.__m="swipe";vote(dx>0?"like":"dislike");return}
   if(dy<-80&&Math.abs(dy)>Math.abs(dx)){reset();openDetail();return}
   reset()});
  el.addEventListener("pointercancel",()=>{if(d){d=null;reset()}});
  const st=document.getElementById("stage");if(st)st.addEventListener("wheel",e=>{if(e.deltaY>25)openDetail()},{passive:true});
 }
-render();
+render();track("deck_loaded",{value:S.cards.length});if(S.remaining[0])track("card_view",{project_id:S.remaining[0].id,position:0});
 </script>
 </body>
 </html>
