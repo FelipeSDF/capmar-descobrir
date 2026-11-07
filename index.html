@@ -103,6 +103,10 @@ async function flush(keepalive){if(sending||(!Q.length&&!NOME))return;sending=tr
  catch(e){fails++;sched(Math.min(30000,1500*2**fails))}
  finally{sending=false}
  if(Q.length&&!fails)flush(keepalive)}
+let EXTRA=[];
+async function fetchDeck(){const c=new AbortController();const t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(API+"?acao=deck&t="+Date.now(),{signal:c.signal});const j=await r.json();return j.ok?j.cards:[]}finally{clearTimeout(t)}}
+const CATS=["Agricultura urbana","Alimentação","Artesanato","Cultura","Educação","Esporte","Meio ambiente","Moda","Pesca e maricultura","Saúde e bem-estar","Serviços","Tecnologia","Turismo","Outro"];
+async function sendSuggestion(sug){const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({session_id:SID,nome:NOME,sugestao:sug})});return r.json()}
 async function fetchRanking(){const r=await fetch(API+"?acao=ranking&t="+Date.now());const j=await r.json();if(!j.ok)throw new Error("ranking");return j}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){track("page_hidden");flush(true)}else track("page_visible")});
 addEventListener("online",()=>{fails=0;flush()});
@@ -152,13 +156,18 @@ const BASE_LIKES={1:14,2:11,3:8,4:12,5:16,6:9,7:10,8:13,9:7,10:15};
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let tutSeen=false;try{tutSeen=localStorage.getItem("capmar_demo_tut")==="1"}catch(e){}
 let RANK=null,RANK_LOADING=false,shownAt=performance.now();
-const S={cards:shuffle(PROJECTS.slice()),remaining:[],votes:{},history:[],detail:null,tutorial:!tutSeen||NOME.length<2,busy:false};
+const S={cards:shuffle(PROJECTS.slice()),remaining:[],votes:{},history:[],detail:null,suggest:false,sent:false,tutorial:!tutSeen||NOME.length<2,busy:false};
 S.remaining=S.cards.slice();
+function mergeExtra(list){const have=new Set(S.cards.map(c=>c.id));const fresh=(list||[]).filter(c=>c&&c.id&&!have.has(c.id));if(!fresh.length)return;EXTRA=EXTRA.concat(fresh);
+ if(!S.history.length){S.cards=shuffle(S.cards.concat(fresh));S.remaining=S.cards.slice()}else{S.cards=S.cards.concat(fresh);S.remaining=S.remaining.concat(fresh)}
+ if(!S.tutorial&&!S.detail&&!S.suggest&&!S.busy)render()}
+fetchDeck().then(mergeExtra).catch(()=>{});
 const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const app=document.getElementById("app");
+function logoFor(c){if(LOGOS[c.id])return LOGOS[c.id];const k=COVERS[hash(c.category||c.name)%COVERS.length];return `<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="${k.fg}"/><text x="32" y="43" text-anchor="middle" font-family="Bricolage Grotesque,system-ui,sans-serif" font-weight="800" font-size="30" fill="${k.bg}">${esc(c.name.trim().charAt(0).toUpperCase())}</text></svg>`}
 function cover(c){const ph=PHOTOS[c.id];if(ph)return `<div class="cover photo"><img src="${ph.src}" alt="Foto do projeto ${esc(c.name)}" draggable="false">`;const k=COVERS[hash(c.category||c.name)%COVERS.length];const t=TILES[c.id%TILES.length];
  return `<div class="cover" style="background:${k.bg};color:${k.fg}"><div class="tiles" style="background-image:${t}"></div><span class="ini">${esc(c.name.charAt(0))}</span>`}
-function cardHTML(c,front){return `<article class="card ${front?"front":"back"}" ${front?`id="front"`:`aria-hidden="true"`}>${cover(c)}<span class="stamp like">CURTI</span><span class="stamp pass">PASSO</span>${front?`<span class="hint"><span>${I.down(14)}Toque para ver mais</span></span>`:""}</div><div class="info"><span class="logo">${LOGOS[c.id]||""}</span><div style="min-width:0">${c.category?`<p class="cat">${esc(c.category)}</p>`:""}<h2 class="h name">${esc(c.name)}</h2></div></div></article>`}
+function cardHTML(c,front){return `<article class="card ${front?"front":"back"}" ${front?`id="front"`:`aria-hidden="true"`}>${cover(c)}<span class="stamp like">CURTI</span><span class="stamp pass">PASSO</span>${front?`<span class="hint"><span>${I.down(14)}Toque para ver mais</span></span>`:""}</div><div class="info"><span class="logo">${logoFor(c)}</span><div style="min-width:0">${c.category?`<p class="cat">${esc(c.category)}</p>`:""}<h2 class="h name">${esc(c.name)}</h2></div></div></article>`}
 function roundBtn(a,label,size,style,icon){return `<div class="round"><button data-a="${a}" aria-label="${label}" style="width:${size}px;height:${size}px;${style}">${icon}</button><small>${label}</small></div>`}
 function render(){
  const total=S.cards.length,done=total-S.remaining.length,finished=S.remaining.length===0;
@@ -175,20 +184,57 @@ function render(){
    +`</div><p class="tip">Arraste para a direita para curtir e para a esquerda para passar.</p><p class="tip" style="margin-top:4px">${likes} curtidas até agora</p>`;
  }
  if(S.detail)h+=detailHTML(S.detail);
+ if(S.suggest)h+=suggestHTML();
  if(S.tutorial)h+=`<div class="tut"><form role="dialog" aria-modal="true" id="tutform" autocomplete="on"><h2 class="h" style="font-size:24px">Qual é o seu nome?</h2><input id="nome" name="name" autocomplete="name" enterkeyhint="go" maxlength="80" placeholder="Seu nome" value="${esc(NOME)}" style="margin-top:12px;width:100%;min-height:48px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font:inherit;font-size:16px;color:var(--foreground);background:var(--surface)"><h3 class="h" style="font-size:18px;margin-top:20px">Como funciona</h3><ul><li><strong style="color:var(--like)">Arraste para a direita</strong> para curtir.</li><li><strong style="color:var(--danger)">Arraste para a esquerda</strong> para passar.</li><li><strong>Toque no cartão</strong> ou role para baixo para ver os detalhes.</li></ul><p class="note">Para a pesquisa do evento, registramos seu nome e o que você faz aqui (votos, tempo e tipo de aparelho). Não pedimos contato.</p><button type="submit" id="tutbtn" class="btn primary" style="margin-top:20px;width:100%" ${NOME.length<2?"disabled":""}>Começar</button></form></div>`;
- app.innerHTML=h;bindDrag();
+ app.innerHTML=h;bindDrag();bindSuggest();
  const f=document.getElementById("tutform");if(f){const i=document.getElementById("nome"),b=document.getElementById("tutbtn");i.addEventListener("input",()=>{b.disabled=i.value.trim().length<2});f.addEventListener("submit",e=>{e.preventDefault();seeTut();flush()});if(!NOME)setTimeout(()=>i.focus(),300)}
 }
-function detailHTML(d){return `<div class="overlay" data-a="close"><div class="sheet" role="dialog" aria-modal="true" data-a="stay"><div class="sheet-h"><span class="logo" style="width:48px;height:48px">${LOGOS[d.id]||""}</span><div style="min-width:0;flex:1">${d.category?`<p class="cat">${esc(d.category)}</p>`:""}<h2 class="h" style="font-size:24px;line-height:1.15">${esc(d.name)}</h2></div><button class="x" data-a="close" aria-label="Fechar detalhes">${I.x(22)}</button></div><div class="sheet-b"><div style="height:220px;border-radius:16px;overflow:hidden;display:flex">${cover(d)}</div></div>${PHOTOS[d.id]?`<p style="margin:6px 0 16px;font-size:12px;color:var(--muted)">Foto: <a href="${PHOTOS[d.id].page}" target="_blank" rel="noopener" style="text-decoration:underline">${esc(PHOTOS[d.id].credit)}</a> (imagem ilustrativa)</p>`:`<div style="height:16px"></div>`}<p style="font-size:14px;color:var(--muted)">Por <strong style="color:var(--secondary)">${esc(d.owner)}</strong></p><p style="margin-top:12px;font-size:16px;line-height:1.6">${esc(d.desc)}</p><ul class="kw">${d.kw.map(k=>`<li class="badge">${esc(k)}</li>`).join("")}</ul>${d.support?`<p style="margin-top:16px"><span class="badge pub">Aceita apoio</span></p>`:""}<a class="btn" style="margin-top:20px" href="#" data-a="noop">Ver página completa${I.out(16)}</a></div><div class="sheet-f"><button class="btn danger" data-a="dislike">${I.x(18)}Passar</button><button class="btn like" data-a="like">${I.heart(18)}Curtir</button></div></div></div>`}
+function detailHTML(d){return `<div class="overlay" data-a="close"><div class="sheet" role="dialog" aria-modal="true" data-a="stay"><div class="sheet-h"><span class="logo" style="width:48px;height:48px">${logoFor(d)}</span><div style="min-width:0;flex:1">${d.category?`<p class="cat">${esc(d.category)}</p>`:""}<h2 class="h" style="font-size:24px;line-height:1.15">${esc(d.name)}</h2></div><button class="x" data-a="close" aria-label="Fechar detalhes">${I.x(22)}</button></div><div class="sheet-b"><div style="height:220px;border-radius:16px;overflow:hidden;display:flex">${cover(d)}</div></div>${PHOTOS[d.id]?`<p style="margin:6px 0 16px;font-size:12px;color:var(--muted)">Foto: <a href="${PHOTOS[d.id].page}" target="_blank" rel="noopener" style="text-decoration:underline">${esc(PHOTOS[d.id].credit)}</a> (imagem ilustrativa)</p>`:`<div style="height:16px"></div>`}${d.owner?`<p style="font-size:14px;color:var(--muted)">Por <strong style="color:var(--secondary)">${esc(d.owner)}</strong></p>`:""}<p style="margin-top:12px;font-size:16px;line-height:1.6">${esc(d.desc)}</p><ul class="kw">${d.kw.map(k=>`<li class="badge">${esc(k)}</li>`).join("")}</ul>${d.support?`<p style="margin-top:16px"><span class="badge pub">Aceita apoio</span></p>`:""}</div><div class="sheet-f"><button class="btn danger" data-a="dislike">${I.x(18)}Passar</button><button class="btn like" data-a="like">${I.heart(18)}Curtir</button></div></div></div>`}
 function endHTML(){
  const liked=S.cards.filter(c=>S.votes[c.id]==="like"),passed=S.cards.filter(c=>S.votes[c.id]==="dislike").length;
- if(!RANK&&!RANK_LOADING){RANK_LOADING=true;track("deck_end",{value:S.cards.length,meta:{likes:liked.length}});setTimeout(()=>flush(),50);setTimeout(()=>fetchRanking().then(r=>{RANK=r;track("ranking_view")}).catch(()=>{RANK={people:0,items:[],fail:true}}).finally(()=>{RANK_LOADING=false;if(!S.remaining.length)render()}),900)}
- const byId=Object.fromEntries(PROJECTS.map(p=>[p.id,p.name]));
+ if(!RANK&&!RANK_LOADING){RANK_LOADING=true;track("deck_end",{value:S.cards.length,meta:{likes:liked.length}});setTimeout(()=>flush(),50);setTimeout(()=>fetchRanking().then(r=>{RANK=r;track("ranking_view")}).catch(()=>{RANK={people:0,items:[],fail:true}}).finally(()=>{RANK_LOADING=false;if(!S.remaining.length&&!S.suggest)render()}),900)}
+ const byId=Object.fromEntries(PROJECTS.concat(EXTRA).map(p=>[p.id,p.name]));
  const rank=RANK&&!RANK.fail?RANK.items.filter(r=>byId[r.project_id]&&r.likes>0).slice(0,5).map(r=>({name:byId[r.project_id],likes:r.likes})):[];
  return `<div class="end"><div class="panel" style="padding:24px;text-align:center"><p class="h" style="font-size:36px">Acabou!</p><p style="margin-top:8px;color:var(--muted)">Você avaliou ${liked.length+passed} projetos: <strong style="color:var(--secondary)">${liked.length} curtidas</strong> e ${passed} passes.</p></div>`
  +(liked.length?`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px">Projetos que você curtiu</h2><ul style="margin-top:8px">${liked.map(c=>`<li><a class="row" href="#" data-a="noop"><span>${esc(c.name)}</span><span style="color:var(--primary)">${I.out(16)}</span></a></li>`).join("")}</ul></section>`:"")
  +`<section class="panel" style="padding:20px"><h2 class="h" style="font-size:18px;display:flex;align-items:center;gap:8px"><span style="color:var(--accent);display:flex">${I.heart(18)}</span>Mais curtidos do evento</h2>${RANK===null?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">Carregando ranking…</p>`:RANK.fail?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">Não foi possível carregar o ranking agora.</p>`:!rank.length?`<p style="margin-top:12px;font-size:14px;color:var(--muted)">O ranking aparece assim que houver curtidas.</p>`:""}<ol style="margin-top:8px">${rank.map((r,i)=>`<li class="rank"><i class="${i===0?"top":""}">${i+1}</i><b>${esc(r.name)}</b><em>${I.heart(14)}${r.likes}</em></li>`).join("")}</ol>${RANK&&!RANK.fail?`<p style="margin-top:12px;padding:0 8px;font-size:13px;color:var(--muted)">${RANK.people} ${RANK.people===1?"pessoa já votou":"pessoas já votaram"}.</p>`:""}</section>`
- +`<div class="panel" style="display:grid;gap:12px;padding:20px"><p style="font-size:15px;color:var(--secondary)"><strong>Seu projeto também pode estar aqui.</strong> Crie uma conta e apresente o que você faz.</p><a class="btn primary" href="#" data-a="noop">Criar minha conta${I.out(18)}</a><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><button class="btn" data-a="restart">${I.undo(16)}Rever tudo</button><a class="btn" href="#" data-a="noop">Ver vitrine</a></div></div></div>`;
+ +`<div class="panel" style="display:grid;gap:12px;padding:20px">${S.sent?`<p style="font-size:15px;color:var(--secondary)"><strong>Obrigado, ${esc(NOME.split(" ")[0])}!</strong> Recebemos seu projeto. A equipe vai olhar e ele pode aparecer aqui no baralho.</p><button class="btn" data-a="suggest">Cadastrar outro projeto</button>`:`<p style="font-size:15px;color:var(--secondary)"><strong>Tem um projeto em Maricá?</strong> Conte pra gente em 1 minuto. Ele pode entrar neste baralho.</p><button class="btn primary" data-a="suggest">Cadastrar meu projeto</button>`}<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><button class="btn" data-a="restart">${I.undo(16)}Rever tudo</button><a class="btn" href="qr.html">Compartilhar</a></div></div></div>`;
+}
+function suggestHTML(){
+ const inp="width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font:inherit;font-size:16px;font-weight:400;color:var(--foreground);background:var(--surface)";
+ const f=(label,html)=>`<label style="display:grid;gap:6px;font-size:14px;font-weight:600;color:var(--secondary)">${label}${html}</label>`;
+ return `<div class="overlay" data-a="sclose"><form class="sheet" id="sugform" role="dialog" aria-modal="true" data-a="stay"><div class="sheet-h"><div style="min-width:0;flex:1"><p class="cat">Cadastro rápido</p><h2 class="h" style="font-size:24px;line-height:1.15">Seu projeto</h2></div><button type="button" class="x" data-a="sclose" aria-label="Fechar">${I.x(22)}</button></div>`
+ +`<div class="sheet-b" style="display:grid;gap:14px">`
+ +f("Nome do projeto",`<input id="sp" maxlength="80" placeholder="Ex.: Horta do meu bairro" style="${inp}">`)
+ +f("Categoria",`<select id="sc" style="${inp}">${CATS.map(c=>`<option>${c}</option>`).join("")}</select>`)
+ +f("O que é o projeto?",`<textarea id="sd" maxlength="600" rows="4" placeholder="Conte em poucas linhas o que você faz e o que precisa" style="${inp};resize:vertical"></textarea>`)
+ +f("Responsável",`<input id="sr" maxlength="80" value="${esc(NOME)}" style="${inp}">`)
+ +f(`Contato <span style="font-weight:400;color:var(--muted)">(opcional: WhatsApp ou Instagram)</span>`,`<input id="sk" maxlength="120" placeholder="WhatsApp ou @perfil" style="${inp}">`)
+ +`<label style="display:flex;gap:10px;align-items:center;font-size:15px;min-height:44px"><input id="sa" type="checkbox" style="width:22px;height:22px;accent-color:var(--like)"> Busco apoio ou investimento</label>`
+ +`<p class="note" style="margin-top:0">O contato fica só com a equipe do CapMar e não aparece no baralho.</p><p id="serr" role="alert" style="color:var(--danger);font-size:14px;font-weight:600"></p></div>`
+ +`<div class="sheet-f" style="grid-template-columns:1fr"><button type="submit" id="sbtn" class="btn primary">Enviar projeto</button></div></form></div>`;
+}
+function bindSuggest(){
+ const form=document.getElementById("sugform");if(!form)return;
+ setTimeout(()=>{const x=document.getElementById("sp");if(x)x.focus()},300);
+ form.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const g=id=>document.getElementById(id).value.trim();
+  const err=document.getElementById("serr"),b=document.getElementById("sbtn");
+  const sug={projeto:g("sp"),categoria:g("sc"),descricao:g("sd"),responsavel:g("sr"),contato:g("sk"),apoio:document.getElementById("sa").checked};
+  if(sug.projeto.length<2){err.textContent="Escreva o nome do projeto.";return}
+  if(sug.descricao.length<10){err.textContent="Conte um pouco mais sobre o projeto.";return}
+  b.disabled=true;b.textContent="Enviando...";err.textContent="";
+  try{
+   const j=await sendSuggestion(sug);
+   if(!j.ok)throw new Error(j.erro||"erro");
+   track("signup_click",{meta:{sugestao:true}});
+   S.suggest=false;S.sent=true;render();
+  }catch(x){
+   b.disabled=false;b.textContent="Enviar projeto";
+   err.textContent=String(x.message).indexOf("limite")>=0?"Você já enviou vários projetos. Fale com a equipe no evento.":"Não foi possível enviar. Confira a internet e tente de novo.";
+  }
+ });
 }
 function vote(choice){
  const c=S.remaining[0];if(!c||S.busy||S.tutorial)return;S.busy=true;
@@ -206,6 +252,8 @@ app.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)retu
  if(a==="noop"){e.preventDefault();return}
  if(a==="stay")return;
  if(a==="close"){S.detail=null;render()}
+ else if(a==="suggest"){S.suggest=true;render()}
+ else if(a==="sclose"){S.suggest=false;render()}
  else if(a==="like"||a==="dislike")vote(a);
  else if(a==="undo")undo();
  else if(a==="detail")openDetail();
@@ -213,6 +261,8 @@ app.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)retu
  else if(a==="restart"){S.history=[];S.votes={};S.cards=shuffle(PROJECTS.slice());S.remaining=S.cards.slice();RANK=null;render()}
 });
 addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&S.suggest){S.suggest=false;render();return}
+ if(e.target&&e.target.closest&&e.target.closest("input,textarea,select"))return;
  if(e.key==="Escape"&&S.detail){S.detail=null;render();return}
  if(S.tutorial)return;
  if(e.key==="ArrowRight"){window.__m="keyboard";vote("like")}
